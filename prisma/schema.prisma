@@ -1,0 +1,74 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String   // hashed
+}
+
+model Student {
+  id         String   @id @default(cuid())
+  regNo      String   @unique
+  name       String
+  department String
+  dob        String   // stored as hashed password (DDMMYYYY format)
+  votes      Vote[]
+}
+
+model Position {
+  id        String    @id @default(cuid())
+  title     String
+  isOpen    Boolean   @default(false)
+  nominees  Nominee[]
+  votes     Vote[]
+}
+
+model Nominee {
+  id         String   @id @default(cuid())
+  name       String
+  year       String
+  department String
+  photoUrl   String
+  positionId String
+  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  votes      Vote[]
+}
+
+model Vote {
+  id         String   @id @default(cuid())
+  studentId  String
+  positionId String
+  nomineeId  String
+  createdAt  DateTime @default(now())
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  nominee    Nominee  @relation(fields: [nomineeId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, positionId]) // enforces one vote per student per position
+}
+
+model Settings {
+  id              String   @id @default(cuid())
+  resultsReleased Boolean  @default(false)
+}
+
+// Records every time an admin removes/resets a student's vote,
+// so there's a trail of who changed what and when.
+model VoteAuditLog {
+  id          String   @id @default(cuid())
+  studentId   String
+  positionId  String
+  nomineeId   String   // who the vote had been for, before removal
+  removedAt   DateTime @default(now())
+  removedBy   String   // admin username who performed the removal
+}
