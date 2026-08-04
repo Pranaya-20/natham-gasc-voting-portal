@@ -42,7 +42,10 @@ export async function loginAdmin(_prevState: AuthState, formData: FormData): Pro
     return { success: true };
   } catch (error: any) {
     console.error('Admin login error:', error);
-    return { error: 'An unexpected database error occurred.' };
+    if (!process.env.DATABASE_URL) {
+      return { error: 'DATABASE_URL environment variable is missing in Vercel project settings.' };
+    }
+    return { error: `Database Error: ${error?.message || 'Failed to connect to database.'}` };
   }
 }
 
@@ -90,7 +93,10 @@ export async function loginStudent(_prevState: AuthState, formData: FormData): P
     return { success: true };
   } catch (error: any) {
     console.error('Student login error:', error);
-    return { error: 'An unexpected database error occurred.' };
+    if (!process.env.DATABASE_URL) {
+      return { error: 'DATABASE_URL environment variable is missing in Vercel project settings.' };
+    }
+    return { error: `Database Error: ${error?.message || 'Failed to connect to database.'}` };
   }
 }
 
