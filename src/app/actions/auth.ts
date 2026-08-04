@@ -8,23 +8,48 @@ import bcrypt from 'bcryptjs';
 type AuthState = { error?: string; success?: boolean };
 
 export async function loginAdmin(_prevState: AuthState, formData: FormData): Promise<AuthState> {
-  const username = formData.get('username') as string;
-  const password = formData.get('password') as string;
+  const usernameInput = ((formData.get('username') as string) || '').trim();
+  const passwordInput = ((formData.get('password') as string) || '').trim();
 
-  if (!username || !password) {
+  if (!usernameInput || !passwordInput) {
     return { error: 'Please enter both username and password.' };
   }
 
   try {
-    const admin = await prisma.admin.findUnique({
-      where: { username: username.trim() },
+    // Auto-seed default admin if database has 0 admin records
+    const adminCount = await prisma.admin.count();
+    if (adminCount === 0) {
+      const defaultUsername = process.env.ADMIN_USERNAME || 'Nathamgasc';
+      const defaultPassword = process.env.ADMIN_PASSWORD || 'vote@gasc';
+      const hashedPassword = bcrypt.hashSync(defaultPassword, 10);
+
+      await prisma.admin.create({
+        data: {
+          username: defaultUsername,
+          password: hashedPassword,
+        },
+      });
+
+      await prisma.settings.upsert({
+        where: { id: 'system-settings' },
+        update: {},
+        create: { id: 'system-settings', resultsReleased: false },
+      });
+      console.log('Auto-seeded default admin account.');
+    }
+
+    // Case-insensitive query for admin account
+    const admin = await prisma.admin.findFirst({
+      where: {
+        username: { equals: usernameInput, mode: 'insensitive' },
+      },
     });
 
     if (!admin) {
       return { error: 'Invalid username or password.' };
     }
 
-    const isValid = bcrypt.compareSync(password, admin.password);
+    const isValid = bcrypt.compareSync(passwordInput, admin.password);
     if (!isValid) {
       return { error: 'Invalid username or password.' };
     }
@@ -54,10 +79,10 @@ export async function logoutAdmin() {
 }
 
 export async function loginStudent(_prevState: AuthState, formData: FormData): Promise<AuthState> {
-  const regNo = formData.get('regNo') as string;
-  const dobInput = formData.get('dob') as string;
+  const regNoInput = ((formData.get('regNo') as string) || '').trim();
+  const dobInput = ((formData.get('dob') as string) || '').trim();
 
-  if (!regNo || !dobInput) {
+  if (!regNoInput || !dobInput) {
     return { error: 'Please enter both Register Number and DOB.' };
   }
 
@@ -67,8 +92,10 @@ export async function loginStudent(_prevState: AuthState, formData: FormData): P
   }
 
   try {
-    const student = await prisma.student.findUnique({
-      where: { regNo: regNo.trim().toUpperCase() },
+    const student = await prisma.student.findFirst({
+      where: {
+        regNo: { equals: regNoInput, mode: 'insensitive' },
+      },
     });
 
     if (!student) {
